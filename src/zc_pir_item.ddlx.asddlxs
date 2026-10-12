@@ -1,0 +1,74 @@
+
+@Metadata.layer: #CORE
+
+@UI.headerInfo: {
+  typeName: 'PIR Upload Item',
+  typeNamePlural: 'PIR Upload Items',
+  title: {
+    type: #STANDARD,
+    value: 'Material'
+  }
+}
+
+annotate entity ZC_PIR_ITEM with
+{
+  @UI.lineItem: [
+    { position: 10, label: 'Excel Row' }
+  ]
+  RowNo;
+
+  @UI.lineItem: [
+    { position: 20, label: 'Action' }
+  ]
+  UploadAction;
+
+  @UI.lineItem: [
+    { position: 30, label: 'Supplier' }
+  ]
+  Supplier;
+
+  @UI.lineItem: [
+    { position: 40, label: 'Article' }
+  ]
+  Material;
+
+  @UI.lineItem: [
+    { position: 50, label: 'Plant' }
+  ]
+  Plant;
+
+  @UI.lineItem: [
+    { position: 60, label: 'Purchasing Org' }
+  ]
+  PurchasingOrg;
+
+  @UI.lineItem: [
+    { position: 70, label: 'Purchase Price' }
+  ]
+  PurchasePrice;
+
+  @UI.lineItem: [
+    { position: 80, label: 'Currency' }
+  ]
+  Currency;
+
+  @UI.lineItem: [
+    { position: 90, label: 'Condition Type' }
+  ]
+  ConditionType;
+
+  @UI.lineItem: [
+    { position: 100, label: 'PIR Number' }
+  ]
+  InfoRecord;
+
+  @UI.lineItem: [
+    { position: 110, label: 'Processing Status' }
+  ]
+  ProcessStatus;
+
+  @UI.lineItem: [
+    { position: 120, label: 'Message' }
+  ]
+  MessageText;
+}

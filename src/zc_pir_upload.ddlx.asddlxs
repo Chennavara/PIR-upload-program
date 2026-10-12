@@ -1,0 +1,82 @@
+
+@Metadata.layer: #CORE
+@UI: {
+  headerInfo: {
+    typeName: 'PIR Upload',
+    typeNamePlural: 'PIR Uploads',
+    title: {
+      type: #STANDARD,
+      value: 'FileName'
+    },
+    description: {
+      type: #STANDARD,
+      value: 'UploadStatus'
+    }
+  }
+}
+annotate entity ZC_PIR_UPLOAD with
+{
+  @UI.lineItem: [
+    { position: 10, label: 'File Name' }
+  ]
+  @UI.identification: [
+    { position: 10, label: 'File Name' }
+  ]
+  FileName;
+
+    @UI.identification: [
+    { position: 20, label: 'Excel Attachment' },
+    {
+      type: #FOR_ACTION,
+      dataAction: 'UploadExcel',
+      label: 'Upload Excel',
+      position: 30
+    }
+  ]
+  FileContent;
+
+  @UI.lineItem: [
+    { position: 20, label: 'Upload Status' }
+  ]
+  @UI.identification: [
+    { position: 30, label: 'Upload Status' }
+  ]
+  UploadStatus;
+
+  @UI.lineItem: [
+    { position: 30, label: 'Total Records' }
+  ]
+  TotalRecords;
+
+  @UI.lineItem: [
+    { position: 40, label: 'Success Records' }
+  ]
+  SuccessRecords;
+
+  @UI.lineItem: [
+    { position: 50, label: 'Error Records' }
+  ]
+  ErrorRecords;
+
+  @UI.lineItem: [
+    { position: 60, label: 'Created At' }
+  ]
+  CreatedAt;
+
+  @UI.facet: [
+    {
+      id: 'UploadInfo',
+      type: #IDENTIFICATION_REFERENCE,
+      label: 'Upload Information',
+      position: 10
+    },
+    {
+      id: 'UploadItems',
+      type: #LINEITEM_REFERENCE,
+      label: 'Uploaded PIR Records',
+      targetElement: '_Items',
+      position: 20
+    }
+  ]
+  UploadUUID;
+}

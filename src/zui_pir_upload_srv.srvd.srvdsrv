@@ -1,0 +1,5 @@
+@EndUserText.label: 'PIR Upload Fiori Service'
+define service ZUI_PIR_UPLOAD_SRV {
+  expose ZC_PIR_UPLOAD as PIRUpload;
+  expose ZC_PIR_ITEM   as PIRItem;
+}

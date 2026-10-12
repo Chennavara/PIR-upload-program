@@ -1,0 +1,123 @@
+
+managed implementation in class ZBP_I_PIR_UPLOAD unique;
+strict ( 2 );
+with draft;
+
+define behavior for ZI_PIR_UPLOAD alias Upload
+persistent table zpir_up_h
+draft table zpir_up_hd
+lock master
+total etag LastChangedAt
+etag master LocalLastChangedAt
+authorization master ( none )
+{
+  create;
+  update;
+  delete;
+
+  field ( numbering : managed, readonly )
+    UploadUUID;
+
+  field ( readonly )
+    UploadStatus,
+    TotalRecords,
+    SuccessRecords,
+    ErrorRecords,
+    CreatedBy,
+    CreatedAt,
+    LastChangedBy,
+    LastChangedAt,
+    LocalLastChangedAt;
+
+
+  action UploadExcel result [1] $self;
+
+  side effects {
+    action UploadExcel affects $self, entity _Items;
+  }
+
+
+  association _Items
+  {
+    create;
+    with draft;
+  }
+
+  draft action Edit;
+  draft action Activate;
+  draft action Discard;
+  draft action Resume;
+  draft determine action Prepare;
+
+  mapping for zpir_up_h
+  {
+    UploadUUID         = upload_uuid;
+    FileName           = file_name;
+    MimeType           = mime_type;
+    FileContent        = file_content;
+    UploadStatus       = upload_status;
+    TotalRecords       = total_records;
+    SuccessRecords     = success_records;
+    ErrorRecords       = error_records;
+    CreatedBy          = created_by;
+    CreatedAt          = created_at;
+    LastChangedBy      = last_changed_by;
+    LastChangedAt      = last_changed_at;
+    LocalLastChangedAt = local_last_changed_at;
+  }
+}
+
+define behavior for ZI_PIR_ITEM alias Item
+persistent table zpir_up_i
+draft table zpir_up_id
+lock dependent by _Upload
+authorization dependent by _Upload
+{
+  update;
+  delete;
+
+  field ( numbering : managed, readonly )
+    ItemUUID;
+
+  field ( readonly )
+    UploadUUID,
+    RowNo,
+    InfoRecord,
+    ProcessStatus,
+    MessageText;
+
+  association _Upload
+  {
+    with draft;
+  }
+
+  mapping for zpir_up_i
+  {
+    ItemUUID         = item_uuid;
+    UploadUUID       = upload_uuid;
+    RowNo            = row_no;
+    UploadAction     = upload_action;
+    Supplier         = supplier;
+    Material         = material;
+    MaterialGroup    = material_group;
+    PurchasingOrg    = purchasing_org;
+    Plant            = plant;
+    PurchasingGroup  = purchasing_group;
+    PurchasingUoM    = purchasing_uom;
+    PurchasePrice    = purchase_price;
+    Currency         = currency;
+    PriceUnit        = price_unit;
+    ValidFrom        = valid_from;
+    ValidTo          = valid_to;
+    ConditionType    = condition_type;
+    MRP              = mrp;
+    TOTPercent       = tot_percent;
+    MinimumQty       = minimum_qty;
+    StandardOrderQty = standard_order_qty;
+    LeadTime         = lead_time;
+    SupplierMaterial = supplier_material;
+    InfoRecord       = info_record;
+    ProcessStatus    = process_status;
+    MessageText      = message_text;
+  }
+}
