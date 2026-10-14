@@ -1,6 +1,8 @@
 
 CLASS zcl_pir_excel DEFINITION
-  PUBLIC FINAL CREATE PUBLIC.
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
 
   PUBLIC SECTION.
 
@@ -71,7 +73,8 @@ CLASS zcl_pir_excel DEFINITION
       WITH EMPTY KEY.
 
     CLASS-METHODS check_row
-      CHANGING cs_row TYPE ty_row.
+      CHANGING
+        cs_row TYPE ty_row.
 
 ENDCLASS.
 
@@ -82,6 +85,10 @@ CLASS zcl_pir_excel IMPLEMENTATION.
 
     CLEAR: et_rows, ev_error.
 
+    "==========================================
+    "1. Verify uploaded file
+    "==========================================
+
     IF iv_file_content IS INITIAL.
       ev_error = 'Please attach an XLSX file'.
       RETURN.
@@ -89,9 +96,9 @@ CLASS zcl_pir_excel IMPLEMENTATION.
 
     DATA lt_raw TYPE tt_raw.
 
-
-
-
+    "==========================================
+    "2. Read XLSX using XCO
+    "==========================================
 TRY.
 
     "1. Get Excel document
@@ -135,13 +142,19 @@ TRY.
 ENDTRY.
 
 
+    "==========================================
+    "3. Verify Excel contains records
+    "==========================================
 
     IF lines( lt_raw ) < 2.
       ev_error = 'Excel has no data rows'.
       RETURN.
     ENDIF.
 
-    "Approved 20-column template
+    "==========================================
+    "4. Verify existing 20-column template
+    "==========================================
+
     DATA(lt_headers) = VALUE string_table(
       ( `Action` )
       ( `Supplier` )
@@ -166,9 +179,11 @@ ENDTRY.
     ).
 
     DATA(ls_header) = lt_raw[ 1 ].
+
     FIELD-SYMBOLS <cell> TYPE any.
 
     LOOP AT lt_headers INTO DATA(lv_header).
+
       DATA(lv_col) = sy-tabix.
 
       ASSIGN COMPONENT lv_col
@@ -180,17 +195,25 @@ ENDTRY.
       ENDIF.
 
       DATA(lv_actual) =
-        to_upper( condense(
-          CONV string( <cell> ) ) ).
+        to_upper(
+          condense( CONV string( <cell> ) )
+        ).
 
       IF lv_actual <> to_upper( lv_header ).
+
         ev_error =
           |Column { lv_col }: Expected { lv_header }|.
+
         RETURN.
+
       ENDIF.
+
     ENDLOOP.
 
-    "Read data rows
+    "==========================================
+    "5. Read all Excel rows
+    "==========================================
+
     LOOP AT lt_raw INTO DATA(ls_raw) FROM 2.
 
       DATA(lv_row_no) = sy-tabix.
@@ -200,6 +223,7 @@ ENDTRY.
       ENDIF.
 
       DATA(ls_row) = VALUE ty_row(
+
         row_no             = lv_row_no
         upload_action      = ls_raw-c01
         supplier           = ls_raw-c02
@@ -221,18 +245,16 @@ ENDTRY.
         standard_order_qty = ls_raw-c18
         lead_time          = ls_raw-c19
         supplier_material  = ls_raw-c20
+
       ).
 
-      check_row( CHANGING cs_row = ls_row ).
+      "Validate mandatory and optional fields
+      check_row(
+        CHANGING
+          cs_row = ls_row
+      ).
 
-      IF ls_row-process_status = 'ERROR'.
-        ev_error =
-          |Excel row { lv_row_no }: | &&
-          ls_row-message_text.
-        CLEAR et_rows.
-        RETURN.
-      ENDIF.
-
+      "Keep every record, including ERROR rows
       APPEND ls_row TO et_rows.
 
     ENDLOOP.
@@ -246,59 +268,110 @@ ENDTRY.
 
   METHOD check_row.
 
+    "==========================================
+    "1. Initial status
+    "==========================================
+
     CLEAR cs_row-message_text.
+
     cs_row-process_status = 'UPLOADED'.
 
     cs_row-upload_action =
-      to_upper( condense( cs_row-upload_action ) ).
+      to_upper(
+        condense( cs_row-upload_action )
+      ).
 
-    cs_row-currency =
-      to_upper( condense( cs_row-currency ) ).
+    cs_row-supplier =
+      condense( cs_row-supplier ).
+
+    cs_row-material =
+      condense( cs_row-material ).
+
+    cs_row-plant =
+      to_upper(
+        condense( cs_row-plant )
+      ).
 
     cs_row-purchasing_uom =
-      to_upper( condense( cs_row-purchasing_uom ) ).
+      to_upper(
+        condense( cs_row-purchasing_uom )
+      ).
+
+    cs_row-currency =
+      to_upper(
+        condense( cs_row-currency )
+      ).
 
     cs_row-condition_type =
-      to_upper( condense( cs_row-condition_type ) ).
+      to_upper(
+        condense( cs_row-condition_type )
+      ).
+
+    "==========================================
+    "2. Mandatory field validation
+    "==========================================
 
     IF cs_row-upload_action <> 'CREATE'
        AND cs_row-upload_action <> 'UPDATE'.
-      cs_row-message_text = 'Invalid action'.
+
+      cs_row-message_text =
+        'Action must be CREATE or UPDATE'.
 
     ELSEIF cs_row-supplier IS INITIAL.
-      cs_row-message_text = 'Supplier missing'.
+
+      cs_row-message_text =
+        'Supplier not maintained'.
 
     ELSEIF cs_row-material IS INITIAL.
-      cs_row-message_text = 'Article missing'.
 
-    ELSEIF cs_row-purchasing_org IS INITIAL.
-      cs_row-message_text = 'Purchasing org missing'.
+      cs_row-message_text =
+        'Article/Material not maintained'.
 
     ELSEIF cs_row-plant IS INITIAL.
-      cs_row-message_text = 'Plant missing'.
+
+      cs_row-message_text =
+        'DC/Plant not maintained'.
 
     ELSEIF cs_row-purchasing_uom IS INITIAL.
-      cs_row-message_text = 'UoM missing'.
+
+      cs_row-message_text =
+        'Purchasing UoM not maintained'.
+
+    ELSEIF cs_row-purchase_price IS INITIAL.
+
+      cs_row-message_text =
+        'Purchase Price not maintained'.
 
     ELSEIF cs_row-currency IS INITIAL.
-      cs_row-message_text = 'Currency missing'.
 
-    ELSEIF cs_row-condition_type IS INITIAL.
-      cs_row-message_text = 'Condition type missing'.
+      cs_row-message_text =
+        'Currency not maintained'.
+
+    ELSEIF cs_row-price_unit IS INITIAL.
+
+      cs_row-message_text =
+        'Price Unit not maintained'.
+
+    ELSEIF cs_row-valid_from IS INITIAL.
+
+      cs_row-message_text =
+        'Valid From not maintained'.
+
+    ELSEIF cs_row-mrp IS INITIAL.
+
+      cs_row-message_text =
+        'MRP not maintained'.
+
+    ELSEIF cs_row-tot_percent IS INITIAL.
+
+      cs_row-message_text =
+        'TOT Percent not maintained'.
+
     ENDIF.
 
-    IF cs_row-message_text IS INITIAL.
-
-      IF cs_row-purchase_price IS INITIAL
-         OR cs_row-price_unit IS INITIAL
-         OR cs_row-valid_from IS INITIAL
-         OR cs_row-valid_to IS INITIAL.
-
-        cs_row-message_text =
-          'Price, price unit and dates required'.
-
-      ENDIF.
-    ENDIF.
+    "==========================================
+    "3. Mandatory numeric validation
+    "==========================================
 
     IF cs_row-message_text IS INITIAL.
 
@@ -306,81 +379,153 @@ ENDTRY.
         val = cs_row-purchase_price
         regex = '^[0-9]{1,13}([.][0-9]{1,2})?$'
       ).
-        cs_row-message_text = 'Invalid price'.
+
+        cs_row-message_text =
+          'Invalid Purchase Price'.
 
       ELSEIF NOT matches(
         val = cs_row-price_unit
         regex = '^[1-9][0-9]{0,4}$'
       ).
-        cs_row-message_text = 'Invalid price unit'.
+
+        cs_row-message_text =
+          'Invalid Price Unit'.
 
       ELSEIF NOT matches(
+        val = cs_row-mrp
+        regex = '^[0-9]{1,13}([.][0-9]{1,2})?$'
+      ).
+
+        cs_row-message_text =
+          'Invalid MRP'.
+
+      ELSEIF NOT matches(
+        val = cs_row-tot_percent
+        regex = '^[0-9]{1,5}([.][0-9]{1,2})?$'
+      ).
+
+        cs_row-message_text =
+          'Invalid TOT Percent'.
+
+      ENDIF.
+
+    ENDIF.
+
+    "==========================================
+    "4. Mandatory Valid From
+    "==========================================
+
+    IF cs_row-message_text IS INITIAL.
+
+      IF NOT matches(
         val = cs_row-valid_from
         regex = '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
       ).
-        cs_row-message_text = 'Invalid start date'.
 
-      ELSEIF NOT matches(
+        cs_row-message_text =
+          'Invalid Valid From (YYYY-MM-DD)'.
+
+      ENDIF.
+
+    ENDIF.
+
+    "==========================================
+    "5. Optional Valid To
+    "==========================================
+
+    IF cs_row-message_text IS INITIAL
+       AND cs_row-valid_to IS NOT INITIAL.
+
+      IF NOT matches(
         val = cs_row-valid_to
         regex = '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
       ).
-        cs_row-message_text = 'Invalid end date'.
 
-      ELSEIF cs_row-valid_from > cs_row-valid_to.
-        cs_row-message_text = 'Invalid date range'.
+        cs_row-message_text =
+          'Invalid Valid To (YYYY-MM-DD)'.
 
-      ENDIF.
-    ENDIF.
+      ELSEIF cs_row-valid_to <
+             cs_row-valid_from.
 
-    "Check optional numeric fields before conversion
-    IF cs_row-message_text IS INITIAL.
+        cs_row-message_text =
+          'Valid To before Valid From'.
 
-      IF cs_row-mrp IS NOT INITIAL
-         AND NOT matches(
-           val = cs_row-mrp
-           regex = '^[0-9]{1,13}([.][0-9]{1,2})?$'
-         ).
-        cs_row-message_text = 'Invalid MRP'.
-      ENDIF.
-
-      IF cs_row-tot_percent IS NOT INITIAL
-         AND NOT matches(
-           val = cs_row-tot_percent
-           regex = '^[0-9]{1,5}([.][0-9]{1,2})?$'
-         ).
-        cs_row-message_text = 'Invalid TOT percent'.
-      ENDIF.
-
-      IF cs_row-minimum_qty IS NOT INITIAL
-         AND NOT matches(
-           val = cs_row-minimum_qty
-           regex = '^[0-9]{1,10}([.][0-9]{1,3})?$'
-         ).
-        cs_row-message_text = 'Invalid MOQ'.
-      ENDIF.
-
-      IF cs_row-standard_order_qty IS NOT INITIAL
-         AND NOT matches(
-           val = cs_row-standard_order_qty
-           regex = '^[0-9]{1,10}([.][0-9]{1,3})?$'
-         ).
-        cs_row-message_text = 'Invalid standard qty'.
-      ENDIF.
-
-      IF cs_row-lead_time IS NOT INITIAL
-         AND NOT matches(
-           val = cs_row-lead_time
-           regex = '^[0-9]{1,9}$'
-         ).
-        cs_row-message_text = 'Invalid lead time'.
       ENDIF.
 
     ENDIF.
+
+    "==========================================
+    "6. Optional MOQ
+    "==========================================
+
+    IF cs_row-message_text IS INITIAL
+       AND cs_row-minimum_qty IS NOT INITIAL.
+
+      IF NOT matches(
+        val = cs_row-minimum_qty
+        regex = '^[0-9]{1,10}([.][0-9]{1,3})?$'
+      ).
+
+        cs_row-message_text =
+          'Invalid MOQ'.
+
+      ENDIF.
+
+    ENDIF.
+
+    "==========================================
+    "7. Optional Standard Order Quantity
+    "==========================================
+
+    IF cs_row-message_text IS INITIAL
+       AND cs_row-standard_order_qty IS NOT INITIAL.
+
+      IF NOT matches(
+        val = cs_row-standard_order_qty
+        regex = '^[0-9]{1,10}([.][0-9]{1,3})?$'
+      ).
+
+        cs_row-message_text =
+          'Invalid Standard Order Qty'.
+
+      ENDIF.
+
+    ENDIF.
+
+    "==========================================
+    "8. Optional Lead Time
+    "==========================================
+
+    IF cs_row-message_text IS INITIAL
+       AND cs_row-lead_time IS NOT INITIAL.
+
+      IF NOT matches(
+        val = cs_row-lead_time
+        regex = '^[0-9]{1,9}$'
+      ).
+
+        cs_row-message_text =
+          'Invalid Lead Time'.
+
+      ENDIF.
+
+    ENDIF.
+
+    "==========================================
+    "9. Final row status
+    "==========================================
 
     IF cs_row-message_text IS NOT INITIAL.
+
       cs_row-process_status = 'ERROR'.
+
     ELSE.
-      cs_row-message_text = 'Excel row uploaded'.
+
+      cs_row-process_status = 'UPLOADED'.
+
+      cs_row-message_text =
+        'Excel row uploaded successfully'.
+
     ENDIF.
 
   ENDMETHOD.

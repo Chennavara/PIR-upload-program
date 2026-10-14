@@ -3,10 +3,31 @@ CLASS lhc_Upload DEFINITION
 
   PRIVATE SECTION.
 
-    METHODS UploadExcel
-      FOR MODIFY
-      IMPORTING keys FOR ACTION Upload~UploadExcel
-      RESULT result.
+
+METHODS UploadExcel
+  FOR MODIFY
+  IMPORTING keys FOR ACTION Upload~UploadExcel
+  RESULT result.
+
+METHODS ValidateData
+  FOR MODIFY
+  IMPORTING keys FOR ACTION Upload~ValidateData
+  RESULT result.
+
+METHODS ProcessUpload
+  FOR MODIFY
+  IMPORTING keys FOR ACTION Upload~ProcessUpload
+  RESULT result.
+
+
+METHODS AutoUploadOnCreate
+  FOR DETERMINE ON SAVE
+  IMPORTING keys
+  FOR Upload~AutoUploadOnCreate.
+METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
+  keys REQUEST requested_authorizations FOR Upload RESULT result.
+METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
+  REQUEST requested_authorizations FOR upload RESULT result.
 
 ENDCLASS.
 
@@ -163,8 +184,8 @@ METHOD UploadExcel.
 
           SupplierMaterial = ls_excel-supplier_material
 
-          ProcessStatus = 'UPLOADED'
-
+          "ProcessStatus = 'UPLOADED'
+ProcessStatus = ls_excel-process_status
           MessageText = ls_excel-message_text
         )
       )
@@ -173,16 +194,53 @@ METHOD UploadExcel.
     "----------------------------------------------
     "6. Create the child records through RAP
     "----------------------------------------------
-    MODIFY ENTITIES OF ZI_PIR_UPLOAD IN LOCAL MODE
+    "MODIFY ENTITIES OF ZI_PIR_UPLOAD IN LOCAL MODE
 
-      ENTITY Upload
-      CREATE BY \_Items
-      AUTO FILL CID
+      "ENTITY Upload
+      "CREATE BY \_Items
+      "AUTO FILL CID
 
-      WITH lt_create
+      "WITH lt_create
 
-      FAILED DATA(ls_create_failed)
-      REPORTED DATA(ls_create_reported).
+      "FAILED DATA(ls_create_failed)
+      "REPORTED DATA(ls_create_reported).
+
+MODIFY ENTITIES OF ZI_PIR_UPLOAD IN LOCAL MODE
+
+  ENTITY Upload
+  CREATE BY \_Items
+
+  FIELDS (
+    RowNo
+    UploadAction
+    Supplier
+    Material
+    MaterialGroup
+    PurchasingOrg
+    Plant
+    PurchasingGroup
+    PurchasingUoM
+    PurchasePrice
+    Currency
+    PriceUnit
+    ValidFrom
+    ValidTo
+    ConditionType
+    MRP
+    TOTPercent
+    MinimumQty
+    StandardOrderQty
+    LeadTime
+    SupplierMaterial
+    ProcessStatus
+    MessageText
+  )
+
+  WITH lt_create
+
+  MAPPED DATA(ls_mapped)
+  FAILED DATA(ls_create_failed)
+  REPORTED DATA(ls_create_reported).
 
     IF ls_create_failed IS NOT INITIAL.
 
@@ -278,6 +336,331 @@ METHOD UploadExcel.
 
 ENDMETHOD.
 
+
+
+METHOD ValidateData.
+
+  LOOP AT keys INTO DATA(ls_key).
+
+    APPEND VALUE #(
+      %tky = ls_key-%tky
+      %msg = new_message_with_text(
+        severity = if_abap_behv_message=>severity-information
+        text = 'Validation not implemented yet'
+      )
+    ) TO reported-upload.
+
+  ENDLOOP.
+
+ENDMETHOD.
+
+
+
+
+
+METHOD ProcessUpload.
+
+  "Read existing Excel items
+  READ ENTITIES OF ZI_PIR_UPLOAD IN LOCAL MODE
+    ENTITY Upload BY \_Items
+    ALL FIELDS
+    WITH CORRESPONDING #( keys )
+    RESULT DATA(lt_items)
+    FAILED DATA(ls_read_failed).
+
+  IF ls_read_failed IS NOT INITIAL.
+    RETURN.
+  ENDIF.
+
+  DATA lt_updates TYPE TABLE FOR UPDATE ZI_PIR_ITEM.
+
+  LOOP AT lt_items INTO DATA(ls_item).
+
+    "Do not repeat already completed records.
+    "QUEUED records MUST be processed here.
+    IF ls_item-ProcessStatus = 'SUCCESS'
+       OR ls_item-ProcessStatus = 'ERROR'
+       OR ls_item-ProcessStatus = 'PROCESSING'.
+      CONTINUE.
+    ENDIF.
+
+    DATA(lv_action) =
+      to_upper( CONV string( ls_item-UploadAction ) ).
+
+    DATA(lv_cid) = CONV abp_behv_cid(
+      |PIR{ ls_item-RowNo }| ).
+
+    DATA(lv_status) = 'ERROR'.
+    DATA(lv_message) = VALUE string( ).
+
+    CASE lv_action.
+
+      "========================================
+      " CREATE PIR
+      "========================================
+      WHEN 'CREATE'.
+
+        MODIFY ENTITIES OF I_PurchasingInfoRecordTP
+
+          ENTITY PurchasingInfoRecord
+          CREATE FIELDS (
+            Supplier
+            Material
+            PurgDocOrderQuantityUnit
+          )
+
+          WITH VALUE #(
+            (
+              %cid = lv_cid
+              Supplier = ls_item-Supplier
+              Material = ls_item-Material
+              PurgDocOrderQuantityUnit =
+                ls_item-PurchasingUoM
+            )
+          )
+
+          CREATE BY \_PurgInfoRecdOrgPlntData
+          FIELDS (
+            PurchasingInfoRecordCategory
+            PurchasingOrganization
+            Plant
+            PurchasingGroup
+            PriceValidityEndDate
+            NetPriceAmount
+            Currency
+            MaterialPriceUnitQty
+            MaterialPlannedDeliveryDurn
+          )
+
+          WITH VALUE #(
+            (
+              %cid_ref = lv_cid
+              %target = VALUE #(
+                (
+                  %cid = |ORG{ ls_item-RowNo }|
+                  PurchasingInfoRecordCategory = '0'
+                  PurchasingOrganization =
+                    ls_item-PurchasingOrg
+                  Plant = ls_item-Plant
+                  PurchasingGroup =
+                    ls_item-PurchasingGroup
+                  PriceValidityEndDate =
+                    COND #(
+                      WHEN ls_item-ValidTo IS NOT INITIAL
+                      THEN ls_item-ValidTo
+                      ELSE '99991231'
+                    )
+                  NetPriceAmount =
+                    ls_item-PurchasePrice
+                  Currency = ls_item-Currency
+                  MaterialPriceUnitQty =
+                    ls_item-PriceUnit
+                  MaterialPlannedDeliveryDurn =
+                    ls_item-LeadTime
+                )
+              )
+            )
+          )
+
+          MAPPED DATA(ls_create_mapped)
+          FAILED DATA(ls_create_failed)
+          REPORTED DATA(ls_create_reported).
+
+        IF ls_create_failed IS INITIAL.
+          lv_status = 'PROCESSING'.
+          lv_message =
+            'CREATE EML accepted; save pending'.
+        ELSE.
+          lv_message = 'PIR CREATE EML failed'.
+
+          LOOP AT ls_create_reported-purchasinginforecord
+            INTO DATA(ls_create_msg).
+
+            IF ls_create_msg-%msg IS BOUND.
+              lv_message =
+                ls_create_msg-%msg->if_message~get_text( ).
+              EXIT.
+            ENDIF.
+
+          ENDLOOP.
+        ENDIF.
+
+      "========================================
+      " UPDATE PIR
+      "========================================
+
+WHEN 'UPDATE'.
+
+  IF ls_item-InfoRecord IS INITIAL.
+
+    lv_status = 'ERROR'.
+
+    lv_message =
+      'Existing PIR number missing for UPDATE'.
+
+  ELSE.
+
+    MODIFY ENTITIES OF I_PurchasingInfoRecordTP
+
+      ENTITY PurgInfoRecdOrgPlantData
+
+      UPDATE FIELDS (
+        PurchasingGroup
+        MaterialPlannedDeliveryDurn
+      )
+
+      WITH VALUE #(
+        (
+          PurchasingInfoRecord = ls_item-InfoRecord
+
+          PurchasingInfoRecordCategory = '0'
+
+          PurchasingOrganization =
+            ls_item-PurchasingOrg
+
+          Plant = ls_item-Plant
+
+          PurchasingGroup =
+            ls_item-PurchasingGroup
+
+          MaterialPlannedDeliveryDurn =
+            ls_item-LeadTime
+        )
+      )
+
+      FAILED DATA(ls_update_failed)
+      REPORTED DATA(ls_update_reported).
+
+    IF ls_update_failed IS INITIAL.
+
+      lv_status = 'PROCESSING'.
+
+      lv_message =
+        'PIR UPDATE accepted; save pending'.
+
+    ELSE.
+
+      lv_status = 'ERROR'.
+
+      lv_message = 'PIR UPDATE failed'.
+
+    ENDIF.
+
+  ENDIF.
+
+
+      WHEN OTHERS.
+        lv_message = 'Invalid CREATE/UPDATE action'.
+
+    ENDCASE.
+
+    "Write current processing result
+    APPEND VALUE #(
+      %tky = ls_item-%tky
+      ProcessStatus = lv_status
+      MessageText = lv_message
+      %control-ProcessStatus = if_abap_behv=>mk-on
+      %control-MessageText = if_abap_behv=>mk-on
+    ) TO lt_updates.
+
+  ENDLOOP.
+
+  IF lt_updates IS NOT INITIAL.
+
+    MODIFY ENTITIES OF ZI_PIR_UPLOAD IN LOCAL MODE
+      ENTITY Item
+      UPDATE FROM lt_updates
+      FAILED DATA(ls_status_failed)
+      REPORTED DATA(ls_status_reported).
+
+  ENDIF.
+
+  READ ENTITIES OF ZI_PIR_UPLOAD IN LOCAL MODE
+    ENTITY Upload
+    ALL FIELDS
+    WITH CORRESPONDING #( keys )
+    RESULT DATA(lt_headers).
+
+  result = VALUE #(
+    FOR ls_header IN lt_headers
+    (
+      %tky = ls_header-%tky
+      %param = ls_header
+    )
+  ).
+
+ENDMETHOD.
+
+
+
+METHOD AutoUploadOnCreate.
+
+  "----------------------------------------------
+  "1. Read PIR upload header
+  "----------------------------------------------
+  READ ENTITIES OF ZI_PIR_UPLOAD IN LOCAL MODE
+    ENTITY Upload
+    FIELDS (
+      FileContent
+      FileName
+      MimeType
+      UploadStatus
+    )
+    WITH CORRESPONDING #( keys )
+    RESULT DATA(lt_uploads)
+    FAILED DATA(ls_read_failed).
+
+  IF ls_read_failed IS NOT INITIAL.
+    RETURN.
+  ENDIF.
+
+  "----------------------------------------------
+  "2. Process uploaded attachments
+  "----------------------------------------------
+  LOOP AT lt_uploads INTO DATA(ls_upload).
+
+    IF ls_upload-FileContent IS INITIAL.
+      CONTINUE.
+    ENDIF.
+
+    IF ls_upload-UploadStatus = 'UPLOADED'
+       OR ls_upload-UploadStatus = 'COMPLETED'.
+      CONTINUE.
+    ENDIF.
+
+    "--------------------------------------------
+    "3. Execute existing UploadExcel action
+    "--------------------------------------------
+    MODIFY ENTITIES OF ZI_PIR_UPLOAD IN LOCAL MODE
+      ENTITY Upload
+      EXECUTE UploadExcel
+      FROM VALUE #(
+        (
+          %tky = ls_upload-%tky
+        )
+      )
+      FAILED DATA(ls_failed)
+      REPORTED DATA(ls_reported).
+
+    "Inspect failures during integration testing
+    IF ls_failed IS NOT INITIAL.
+      CONTINUE.
+    ENDIF.
+
+  ENDLOOP.
+
+ENDMETHOD.
+
+
+
+
+
+
+  METHOD get_instance_authorizations.
+  ENDMETHOD.
+
+  METHOD get_global_authorizations.
+  ENDMETHOD.
 
 ENDCLASS.
 

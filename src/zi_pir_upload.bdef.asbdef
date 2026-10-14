@@ -9,9 +9,9 @@ draft table zpir_up_hd
 lock master
 total etag LastChangedAt
 etag master LocalLastChangedAt
-authorization master ( none )
+authorization master ( instance  )
 {
-  create;
+  create (authorization : global );
   update;
   delete;
 
@@ -31,10 +31,22 @@ authorization master ( none )
 
 
   action UploadExcel result [1] $self;
+ action ValidateData result [1] $self;
+action ProcessUpload result [1] $self;
+//action ( features : instance ) ProcessUpload
+  //result [1] $self;
 
-  side effects {
-    action UploadExcel affects $self, entity _Items;
-  }
+ side effects {
+  action UploadExcel affects $self, entity _Items;
+  action ValidateData affects $self, entity _Items;
+  action ProcessUpload affects $self, entity _Items;
+}
+  // Automatically parse Excel when attachment changes
+  determination AutoUploadOnCreate on save
+{
+  create;
+  field FileContent;
+}
 
 
   association _Items

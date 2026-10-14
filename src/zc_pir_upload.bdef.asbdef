@@ -16,7 +16,10 @@ define behavior for ZC_PIR_UPLOAD alias Upload
   use action Discard;
   use action Resume;
   use action Prepare;
-  use action UploadExcel;
+use action UploadExcel;
+use action ValidateData;
+use action ProcessUpload;
+
 
 }
 

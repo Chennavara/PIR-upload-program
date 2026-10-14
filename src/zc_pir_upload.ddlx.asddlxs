@@ -1,5 +1,6 @@
 
 @Metadata.layer: #CORE
+
 @UI: {
   headerInfo: {
     typeName: 'PIR Upload',
@@ -14,69 +15,176 @@
     }
   }
 }
+
 annotate entity ZC_PIR_UPLOAD with
 {
+
+  //============================================
+  // 1. File Name
+  //============================================
+
   @UI.lineItem: [
-    { position: 10, label: 'File Name' }
+    {
+      position: 10,
+      label: 'File Name'
+    }
   ]
+
   @UI.identification: [
-    { position: 10, label: 'File Name' }
+    {
+      position: 10,
+      label: 'File Name'
+    }
   ]
   FileName;
 
-    @UI.identification: [
-    { position: 20, label: 'Excel Attachment' },
+
+  //============================================
+  // 2. Excel Attachment
+  //============================================
+
+  @UI.identification: [
     {
-      type: #FOR_ACTION,
-      dataAction: 'UploadExcel',
-      label: 'Upload Excel',
-      position: 30
+      position: 20,
+      label: 'Excel Attachment'
     }
   ]
   FileContent;
 
-  @UI.lineItem: [
-    { position: 20, label: 'Upload Status' }
-  ]
-  @UI.identification: [
-    { position: 30, label: 'Upload Status' }
-  ]
-  UploadStatus;
+
+  //============================================
+  // 3. Upload Status
+  //============================================
 
   @UI.lineItem: [
-    { position: 30, label: 'Total Records' }
+    {
+      position: 20,
+      label: 'Upload Status'
+    }
+  ]
+
+  @UI.identification: [
+    {
+      position: 30,
+      label: 'Upload Status'
+    }
+  ]
+  UploadStatus;
+//============================================
+  // 4. Total Records
+  //============================================
+
+  @UI.lineItem: [
+    {
+      position: 30,
+      label: 'Total Records'
+    }
+  ]
+
+  @UI.identification: [
+    {
+      position: 40,
+      label: 'Total Records'
+    }
   ]
   TotalRecords;
 
+
+  //============================================
+  // 5. Success Records
+  //============================================
+
   @UI.lineItem: [
-    { position: 40, label: 'Success Records' }
+    {
+      position: 40,
+      label: 'Success Records'
+    }
+  ]
+
+  @UI.identification: [
+    {
+      position: 50,
+      label: 'Success Records'
+    }
   ]
   SuccessRecords;
 
+
+  //============================================
+  // 6. Error Records
+  //============================================
+
   @UI.lineItem: [
-    { position: 50, label: 'Error Records' }
+    {
+      position: 50,
+      label: 'Error Records'
+    }
+  ]
+
+  @UI.identification: [
+    {
+      position: 60,
+      label: 'Error Records'
+    }
   ]
   ErrorRecords;
 
+  
+
+
+  //============================================
+  // 7. Created At
+  //============================================
+
   @UI.lineItem: [
-    { position: 60, label: 'Created At' }
+    {
+      position: 60,
+      label: 'Created At'
+    }
   ]
   CreatedAt;
 
-  @UI.facet: [
-    {
-      id: 'UploadInfo',
-      type: #IDENTIFICATION_REFERENCE,
-      label: 'Upload Information',
-      position: 10
-    },
-    {
-      id: 'UploadItems',
-      type: #LINEITEM_REFERENCE,
-      label: 'Uploaded PIR Records',
-      targetElement: '_Items',
-      position: 20
-    }
-  ]
-  UploadUUID;
+
+  //============================================
+  // 8. RAP Action Buttons
+  //============================================
+
+@UI.identification: [
+  //{
+    //type: #FOR_ACTION,
+    //dataAction: 'UploadExcel',
+    //label: 'Upload Excel',
+    //position: 70
+  //},
+  //{
+    //type: #FOR_ACTION,
+    //dataAction: 'ValidateData',
+    //label: 'Validate Data',
+    //position: 80
+  //},
+  {
+    type: #FOR_ACTION,
+    dataAction: 'ProcessUpload',
+    label: 'Process PIR',
+    position: 90
+  }
+]
+@UI.facet: [
+  {
+    id: 'UploadInfo',
+    type: #IDENTIFICATION_REFERENCE,
+    label: 'Upload Information',
+    position: 10
+  },
+  {
+    id: 'UploadItems',
+    type: #LINEITEM_REFERENCE,
+    label: 'Uploaded PIR Records',
+    targetElement: '_Items',
+    position: 20
+  }
+]
+UploadUUID;
+
+
 }
